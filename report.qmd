@@ -1,0 +1,340 @@
+---
+title: "Report - Fuel Watch"
+author: "Leona Hasani"
+format:   
+  html:                     
+    standalone: true        
+    embed-resources: true   
+    code-fold: true         
+    number-sections: true   
+    message: false
+---
+
+# Fuel Watch Overview
+
+In this report we were given to analyse the data from the last 12 month of Fuel Watch from the website of https://www.fuelwatch.wa.gov.au/retail/historic. The new dataframe that has been created from the binding of the last 12 months has been name ***FuelWatch***.
+
+From the link of Fuel Watch we can see that FuelWatch is a fuel price monitoring service created by the Western Australian Government in January 2001 in response to a Parliamentary Select Committee which investigated the then intra-daily price changes and the city-country price differential in 2000. *FuelWatch is the only service in Australia which gives motorists the opportunity to access tomorrow's fuel prices today.*
+
+This dataframe contains ***766,147*** observations and has ***11*** columns (variables).
+
+Explaining some of the most important variables of *Fuel Watch* that we will be using for the further analysis in this report:
+
+-   ***PUBLISH DATE*** is the datetime in the format of dd/mm/yy;
+
+-   ***TRADING NAME*** reffers to the official name of the company;
+
+-   ***BRAND DESCRIPTION*** is the the name of the company which reffers to the name that the company is known in the public;
+
+-   ***PRODUCT PRICE*** is the the price for each different brand and type of product, from the website and also searching through internet the price for each fuel in the data is given in cents per litre, so 112.11 i.e stands for 112.11 cents per 1 litre of fuel (1.12 Australian dollar per litre);
+
+-   ***AREA DESCRIPTION*** is the area in which the business is operating, in this case the fuel company;
+
+-   ***REGION DESCRIPTION*** takes into consideration larger geographical units. However it shows the region in which the fuel company is selling a certain fuel product.
+
+
+```{r, results='hide'}
+#| label: Loading packages
+#| echo: false
+#| message: false
+
+#Loading the needed packages for the further data analysis and visualization
+
+library(tidyverse)
+library(patchwork)
+```
+
+# Visual Exploration of Fuel Watch dataframe
+
+## Loading and filtering the dataframe
+
+Here, first we have load the data frame and then we have filtered it, only for the product description to be ULP and so on creating a new data frame named FuelWatch_ULP. Based on my search ULP stands for unleaded petroleum and this petrol has an octane rating of 91 and is considered as 'regular' unleaded rather than being classed as 'premium. ' Most petrol cars in Australia will take regular ULP and as such, it's the most common type of petrol. However, I have also used sapply function in order to count for na's columns. As I saw there is only one column that has 766,147 na's values, named "...11", so I decided to delete this column from the FuelWatch since we won't need it in the further analysis.
+
+```{r, results='hide'}
+#| label: Loading and filtering the data 
+
+library(tidyverse)
+
+# Loading the csv file of FuelWatch 
+
+FuelWatch <- read.csv("FuelWatch.csv")
+glimpse(FuelWatch)
+
+# Searching for any NA columns, than deleting the column that has all of its observations with the NA value
+
+na_count <- sapply(FuelWatch, function(x) sum(is.na(x)))
+na_count
+
+FuelWatch <- subset(FuelWatch, select = -c(...11))
+
+# Filtering the Fuelwatch dataframe only for the ULP product designer and creating a new dataframe named FuelWatch_ULP
+
+FuelWatch_ULP <- FuelWatch |>
+  filter(PRODUCT_DESCRIPTION == "ULP")
+
+```
+
+## Brands
+
+### Bar plot about the data points of all brands
+
+Here, we create a bar plot which will show the frequency of the brands for the ULP product. The order of the brands will be from the one that sells the most to the one that sells the least for this kind of fuel product. We should keep in mind that this plot will be counting the number of the ULP product in the last 12 month period.
+
+```{r}
+#| label: Brands bar plot
+
+FuelWatch_ULP |>
+  ggplot(mapping=aes(y=fct_rev(fct_infreq(BRAND_DESCRIPTION)))) +
+  geom_bar(color = "darkblue", fill = "deepskyblue", alpha = 0.5) +
+  labs(y="",
+       x="Frequency of the ULP product",
+       title = "Frequency of the brands for the ULP product",
+       caption = "Data provided from https://www.fuelwatch.wa.gov.au/retail/historic") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5, color = "darkgrey"))
+
+```
+
+#### Insight from the graph above
+
+As we can observe from the graph above, we can say that the company that sells (has) most of the ULP product in Australia is the BP with nearly 40,000 products of ULP, than followed by Ampol with more than 30,000 ULP products sold. This plot only gives us a slight idea of which of the brands is selling most of the ULP products in their different location in the timeframe of 12 months. 
+
+### Bar plot about the mean price for each brand and the difference within the 12 month period of time
+
+In this plot, we want to examine the average price dynamics of the "ULP" product by brand for time span from November 2022 to October 2023. We want to understand how various fuel brands in Australia have performed in terms of price over 1 year. We will show the average price trends using a line plot, which provides important insights into the ULP market's competitive environment. 
+
+```{r}
+#| label: Average price per each brand during the one year period time
+
+custom_order = c("Nov", "Dec", "Jan", "Feb", "Mar", "Apr","May", "Jun", "Jul", "Aug", "Sep", "Oct")
+
+FuelWatch_ULP1 <- FuelWatch_ULP |>
+  mutate(PUBLISH_DATE1 = as.Date(PUBLISH_DATE, format = "%d/%m/%Y")) |>
+  mutate(year = year(PUBLISH_DATE1), month = month(PUBLISH_DATE1)) |>
+  filter((year == 2022 & month >= 11) | (year == 2023 & month <= 10)) |>
+  group_by(BRAND_DESCRIPTION, month) |>
+  summarise(mean_price = mean(PRODUCT_PRICE), .groups = 'drop') |>
+  mutate(month = factor(month, 
+                        levels = c(11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)))
+
+
+ggplot(data = FuelWatch_ULP1, aes(x = month, y = mean_price, color = BRAND_DESCRIPTION, group = BRAND_DESCRIPTION)) +
+  geom_line(linewidth = 0.5) +
+  labs(title = "Average Price Over Time by Brand for the ULP Product",
+       x = "Months starting from November 2022 until October 2023",
+       y = "Average Price",
+       caption = "Data provided from https://www.fuelwatch.wa.gov.au/retail/historic",
+       color = "Brand name") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5, color = "darkgrey"))+
+  scale_x_discrete(labels = custom_order)
+
+
+```
+#### Insights from the graph above
+
+The average price of the "ULP" product across several brands is shown in an appealing line plot as a consequence. For instance, we can see from the line graph that there are 29 brands or companies exactly that operate in Australia as fuel companies. It is a little bit harder for us to tell or to recognize each colored line which represents the brand itself and to describe the trend of average price for the ULP product. However, we can see this graph from a different perspective. We could analyse the graph that how the prices have changed during the time span from November 2022 to October 2023 and see if fluctuations have occurred. From the plot we can see that the ULP product has had its lowest average price for 155.11 cents per litre in January and it was offered by Costco (Costco was also offering the best prices even during the other months). But, lets see the other part of the medal, which brands were offering the higher prices during January? Those are Gull, Independent, Eagle, Coles Express, Shell etc., and also as the time passes by we can see from the graph that the prices were raising and also the companies that have the highest price for ULP are Gull, Eagle, Shell etc., and the lowest one is the one that Costco sells. From this, we can say that each brand has remained in the same fluctuation. The Costco brand offers the best prices for consumers during this time, while the Eagle brand has the highest prices (among with other brands mentioned above). But if the consumer asks, what about quality vs prices analysis, we don't have the needed measurements for quality of the ULP fuel that each brand sells, so I cannot give a final answer for that.
+
+
+## Regions
+
+### Barplot about the data points of all regions
+
+Here, we create a bar plot which will show the frequency of regions that sell the ULP product. The order of the regions will be from the one that sells the most to the one that sells the least for this kind of fuel product.
+
+```{r}
+#| label: Regions barplot
+
+
+FuelWatch_ULP |>
+  ggplot(mapping=aes(y=fct_rev(fct_infreq(REGION_DESCRIPTION)))) +
+  geom_bar(color = "darkblue", fill = "deepskyblue", alpha = 0.7) +
+  labs(y="",
+       x="Frequency of the ULP product ",
+       title = "Frequency of the regions that sell ULP product",
+       caption = "Data provided from https://www.fuelwatch.wa.gov.au/retail/historic") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5, color = "darkgrey"))
+
+
+```
+#### Insight from the graph above
+
+From this bar plot we can see that the region that sells the most of the ULP fuel is the Metro or known as Metropolitan Area in Australia. This is also logical since there may be living the most of the population, and its a metropolitan area. The regions that sell the least of the ULP fuel are Kimberley and Gascoyne. These regions also have the lowest number of the population in comparison to the other regions in Australia.
+
+### Bar plot about the mean price for each region and the difference within the 12 month period of time
+
+Here we want to see if there are any patterns for the average price dynamics of the "ULP" product by region for time span from November 2022 to October 2023. We want to understand how various fuel brands in Australia have performed in terms of price over 1 year. We will show the average price trends using a line plot, which provides important insights into the ULP market's competitive environment. 
+
+```{r}
+#| label: Average price for each region during the 1 year time 
+
+custom_order = c("Nov", "Dec", "Jan", "Feb", "Mar", "Apr","May", "Jun", "Jul", "Aug", "Sep", "Oct")
+
+custom_colors <- c("black","blue","yellow","deeppink","green", "red","coral", "cyan",                       
+                   "darkgreen", "darkmagenta")
+
+
+FuelWatch_ULP2 <- FuelWatch_ULP |>
+  mutate(PUBLISH_DATE1 = as.Date(PUBLISH_DATE, format = "%d/%m/%Y")) |>
+  mutate(year = year(PUBLISH_DATE1), month = month(PUBLISH_DATE1)) |>
+  filter((year == 2022 & month >= 11) | (year == 2023 & month <= 10)) |>
+  group_by(REGION_DESCRIPTION, month) |>
+  summarise(mean_price = mean(PRODUCT_PRICE), .groups = 'drop') |>
+  mutate(month = factor(month, 
+                        levels = c(11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)))
+
+
+ggplot(data = FuelWatch_ULP2, aes(x = month, y = mean_price, color = REGION_DESCRIPTION, group = REGION_DESCRIPTION)) +
+  geom_line(linewidth = 0.5) +
+  labs(title = "Average Price Over Time by Region",
+       x = "Months starting from November 2022 until October 2023",
+       y = "Average Price",
+       caption = "Data provided from https://www.fuelwatch.wa.gov.au/retail/historic",
+       color = "Region in Australia") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5, color = "darkgrey"))+
+  scale_x_discrete(labels = custom_order)+
+  scale_color_manual(values = custom_colors)
+```
+#### Insight from the graph above
+
+From the graph we can conclude that from the regions that Australia has, the average price of ULP fuel will be the lowest in the regions that live more residents, or the metropolitan areas, but the highest price as we can see is for the Kimberley region. From my search through internet, I could see that this area is known for large swaths of wilderness and also the density of population is 0.07 person per kilometer square.
+
+## Areas in the region Peel
+
+### Barplot about the data points of region Peel
+
+In this bar plot we aim to show the average price of ULP Fuel in the areas of Peel Region. Even in this graph the data will be ordered, from the area that sells the most of ULP Fuel to the least one.
+
+```{r}
+#| label: Area barplot in the peel region
+
+FuelWatch_ULP3 <- FuelWatch_ULP |>
+  filter(REGION_DESCRIPTION == "Peel") 
+
+  ggplot(data = FuelWatch_ULP3, mapping = aes(y=fct_rev(fct_infreq(AREA_DESCRIPTION)))) +
+  geom_bar(color = "darkblue", fill = "deepskyblue", alpha = 0.7) +
+  labs(y="",
+       x="Frequency of the areas in the Peel Region that sell ULP Fuel",
+       title = "Average price of the ULP Fuel in the areas of Peel Region",
+       caption = "Data provided from https://www.fuelwatch.wa.gov.au/retail/historic") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5, color = "darkgrey"))
+```
+#### Insight from the graph above
+
+From the bar plot we can see that in the Peel Region the area that sells the most of the ULP fuel is the Mandurah area, and the least one is Waroona. As I thought, this is as a cause from the number of residents each area has, so the Mandurah has the largest number of population while Waroona has the lowest. It could be concluded that the population is an indicator on how many ULP fuel each area will sell.
+
+### Bar plot about the mean price for each area in the Peel region and the difference within the 12 month period of time
+
+In this bar plot, will be shown average price  patterns of the ULP fuel for the period from November 2022 to October 2023, in the areas of the Peel region. We will show the average price trends using a line plot, which provides important insights into the ULP market's competitive environment. 
+
+```{r}
+#| label: Average price for each area in the peel region
+
+custom_order = c("Nov", "Dec", "Jan", "Feb", "Mar", "Apr","May", "Jun", "Jul", "Aug", "Sep", "Oct")
+
+FuelWatch_ULP4 <- FuelWatch_ULP3 |>
+  mutate(PUBLISH_DATE1 = as.Date(PUBLISH_DATE, format = "%d/%m/%Y")) |>
+  mutate(year = year(PUBLISH_DATE1), month = month(PUBLISH_DATE1)) |>
+  filter((year == 2022 & month >= 11) | (year == 2023 & month <= 10)) |>
+  group_by(AREA_DESCRIPTION, month) |>
+  summarise(mean_price = mean(PRODUCT_PRICE), .groups = 'drop') |>
+  mutate(month = factor(month, 
+                        levels = c(11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)))
+
+
+ggplot(data = FuelWatch_ULP4, aes(x = month, y = mean_price, color = AREA_DESCRIPTION, group = AREA_DESCRIPTION)) +
+  geom_line(linewidth = 0.8) +
+  labs(title = "Average Price Over Time by the areas in the Peel Region",
+       x = "Months starting from November 2022 until October 2023",
+       y = "Average Price",
+       caption = "Data provided from https://www.fuelwatch.wa.gov.au/retail/historic", 
+       color = "Areas in the Peel Region: ") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5, color = "darkgrey"))+
+  scale_x_discrete(labels = custom_order)
+```
+#### Insight from the graph above
+
+For the area of the Mandurah and Murray the average prices of the ULP fuel are having almost the same pattern, the highest price for both of them was in September 2023 and its decreasing since then. However, the Waroona area in the Peel Region which has the lowest number of residents is having much higher prices than those two other areas, and the prices from July 2023 have been increasing for this area. We can make a hypothesis that this has to do with the low number of population.
+
+
+## Petrol Station in the area of Murray
+
+Now, in this bar plot we want to show the average prices for the ULP fuel, that each petrol station has had during the period of time from November 2022 to October 2023, specifically in the Murray area that is located in the Peel region of Australia.
+
+### Average Price Over Time by petrol station in the Murray area, Peel Region
+
+```{r}
+#| label: Average price for each petrol station in the area of Murray, in the Peel region
+
+custom_order = c("Nov", "Dec", "Jan", "Feb", "Mar", "Apr","May", "Jun", "Jul", "Aug", "Sep", "Oct")
+
+custom_colors2 <- c("black", "grey", "blue", "yellow", "orange", "deeppink","green", "red","coral", "cyan",                    "darkgreen", "deepskyblue", "pink", "brown", "darkmagenta")
+
+FuelWatch_ULP5 <- FuelWatch_ULP |>
+  mutate(PUBLISH_DATE1 = as.Date(PUBLISH_DATE, format = "%d/%m/%Y")) |>
+  mutate(year = year(PUBLISH_DATE1), month = month(PUBLISH_DATE1)) |>
+  filter((year == 2022 & month >= 11) | (year == 2023 & month <= 10)) |>
+  filter(AREA_DESCRIPTION == "Murray" & REGION_DESCRIPTION == "Peel") |>
+  group_by(month, TRADING_NAME, AREA_DESCRIPTION, REGION_DESCRIPTION) |>
+  summarise(mean_price = mean(PRODUCT_PRICE), .groups = 'drop') |>
+  mutate(month = factor(month, 
+                        levels = c(11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)))
+
+
+ggplot(data = FuelWatch_ULP5, 
+       aes(x = month, y = mean_price, color = TRADING_NAME, group = TRADING_NAME)) +
+  geom_line(linewidth = 0.6) +
+  labs(title = "Average-Price Over Time by petrol station",
+       x = "Months starting from November 2022 until October 2023",
+       y = "Average Price",
+       caption = "Data provided from https://www.fuelwatch.wa.gov.au/retail/historic",
+       color = "Petrol Station:") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5, color = "darkgrey"))+
+  scale_x_discrete(labels = custom_order) +
+  scale_color_manual(values = custom_colors2)
+```
+#### Insight from the graph above
+
+From the graph we can see that the most of the petrol station in the Murray area (Peel Region) are having almost the same pattern for their price strategy for the ULP Strategy, including their differences. In the other hand, one of the petrol named The Canal Shop is having the same average price during entire time. Most of the petrols had increased their prices since July 2023 until September 2023, excluding The Canal Shop which is having the same price, and also 53 Mile Roadhouse and Dwellingup BP are getting higher prices for ULP even in September and so on. Liberty Pinjarra, United Pinjarra, and Vibe Pinjarra are offering the best average prices for the ULP fuel in the area of Murray from the Peel region in Australia. For the Canal Shop, we can see that there is only 1 address that this company is operating and this might be the reason why the price is staying the same during this time period.
+
+## Different patterns of the price dynamics
+
+As we can observe from the graphs above, we can say that there are three different patterns of price dynamics within the 1 year period of time. For instance, we can see that during November to December there is a trend of decreasing prices, from November until July we can observe that for the most of the petrol brands is happening the same situation, the prices are fluctuating, there is increase & decrease of ULP fuel price. From this we can infer that most of the companies are being influenced by each other and the base price that this fuel is being sold at. However there is another trend from July 2023 until September 2023 that the prices have been increasing only. All of these trends could be somehow linked with the worldwide trend of the fuel industry.
+
+## Patterns of the Fuel Watch dataset
+
+From the graphs above, analysis and the insights that we have from this data set, what could be interesting also to watch in the future is how the prices changes within different regions of Australia and why does this occurs. Could this be from the fact that in more populated areas the prices for the ULP fuel are lower in comparison to those less inhabited areas in Australia, or is it something else?
+
+```{r}
+ggplot(data = FuelWatch_ULP, aes(y = PRODUCT_PRICE, x = REGION_DESCRIPTION)) +
+  geom_boxplot(fill = "deepskyblue", color = "darkblue", alpha = 0.7) +
+  labs(
+    title = "Box Plot of ULP Fuel Prices by Region",
+    x = "Region",
+    y = "Price (cents per liter)",
+    caption = "Data provided from https://www.fuelwatch.wa.gov.au/retail/historic") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.caption = element_text(hjust = 0.5)) +
+  coord_flip()
+
+```
+### Insight from the boxplot
+
+From the box plot above we can see that the regions that have the lowest prices for the fuel of ULP during the 1 year time are those that are more populated, and the area that it is less inhabited is actually the one that has the highest prices for ULP fuel. However, for some of the regions, we could see that there are some outliers, meaning that some of the prices are way more higher than comparing to the average price that the particular region has. (Looking more or analyzing more the outliers we could see what is really within the data or what pattern is really hiding beneath it). We could go further and see if that is only happening during a time frame, when all the prices are getting higher for each petrol station, or is it only some of the petrol companies that are maintaining higher prices and it doesn't have to do with the fact that its the same for all petrol companies during a certain period. 
+
+
+
+
